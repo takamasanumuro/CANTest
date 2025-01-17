@@ -1,13 +1,16 @@
 // Copyright (c) Sandeep Mistry. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-#ifdef TRANSMITTER
+
+
 #include <Arduino.h>
 #include <CAN.h>
 
 void setup() {
 	Serial.begin(115200);
 	while (!Serial);
+
+	pinMode(GPIO_NUM_2, OUTPUT);
 
 	Serial.println("CAN Sender");
 	CAN.setPins(GPIO_NUM_12, GPIO_NUM_13);
@@ -28,9 +31,12 @@ void loop() {
 	CAN.write('l');
 	CAN.write('l');
 	CAN.write('o');
-	CAN.endPacket();
+	if (!CAN.endPacket()) {
+		Serial.printf("TX failed\n");
+	}
 
 	Serial.println("done");
+	digitalWrite(GPIO_NUM_2, !digitalRead(GPIO_NUM_2));
 
 	delay(1000);
 
@@ -47,7 +53,7 @@ void loop() {
 
 	Serial.println("done");
 
+	digitalWrite(GPIO_NUM_2, !digitalRead(GPIO_NUM_2));
 	delay(1000);
 }
 
-#endif

@@ -1,12 +1,26 @@
 // Copyright (c) Sandeep Mistry. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
-#ifdef RECEIVER
+
 #include <Arduino.h>
 #include <CAN.h>
 
+static void ledBlinker(void *parameter) {
+
+	pinMode(GPIO_NUM_2, OUTPUT);
+	while (true) {
+		digitalWrite(GPIO_NUM_2, HIGH);
+		delay(500);
+		digitalWrite(GPIO_NUM_2, LOW);
+		delay(500);
+	}
+}
+
 void setup() {
-    Serial.begin(115200);
+	xTaskCreate(ledBlinker, "ledBlinker", 2048, NULL, 1, NULL);
+    
+	Serial.begin(115200);
     while (!Serial);
+
 
     Serial.println("CAN Receiver");
     CAN.setPins(GPIO_NUM_12, GPIO_NUM_13);
@@ -21,7 +35,7 @@ void loop() {
     // try to parse packet
     int packetSize = CAN.parsePacket();
 
-    if (packetSize || CAN.packetId() != -1) {
+    if (packetSize) {
 		// received a packet
 		Serial.print("Received ");
 
@@ -45,6 +59,7 @@ void loop() {
 			Serial.println(packetSize);
 
 			// only print packet data for non-RTR packets
+
 			while (CAN.available()) {
 				Serial.print((char)CAN.read());
 			}
@@ -55,4 +70,3 @@ void loop() {
     }
 }
 
-#endif
