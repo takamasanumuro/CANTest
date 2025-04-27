@@ -15,20 +15,44 @@ static void ledBlinker(void *parameter) {
 	}
 }
 
+static void send_daly_frame() {
+	//CAN.beginPacket(0x18, -1, true);
+	//CAN.write(0x90);
+	//CAN.write(0x01);
+	//CAN.write(0x40);
+	//if (!CAN.endPacket()) {
+	//	Serial.printf("TX failed\n");
+	//}
+
+	CAN.beginExtendedPacket(0x18900140, -1, true);
+	CAN.endPacket();
+}
+
+void send_daly_frame(int interval) {
+	static unsigned long last_time = 0;
+	if (millis() - last_time < interval) {
+		return;
+	}
+	last_time = millis();
+	send_daly_frame();
+	Serial.printf("Sent\n");
+}
+
 void setup() {
 	xTaskCreate(ledBlinker, "ledBlinker", 2048, NULL, 1, NULL);
-    
+
 	Serial.begin(115200);
     while (!Serial);
 
 
     Serial.println("CAN Receiver");
     CAN.setPins(GPIO_NUM_12, GPIO_NUM_13);
-    // start the CAN bus at 500 kbps
-    if (!CAN.begin(500E3)) {
+    if (!CAN.begin(250E3)) {
         Serial.println("Starting CAN failed!");
         while (1);
     }
+
+
 }
 
 void loop() {
@@ -68,5 +92,7 @@ void loop() {
 
 		Serial.println();
     }
+
+	send_daly_frame(1000);
 }
 
