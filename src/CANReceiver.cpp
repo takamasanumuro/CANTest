@@ -2,7 +2,10 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #include <Arduino.h>
-#include <CAN.h>
+#include "driver/twai.h"
+#include "esp_log.h" 
+
+static const char* TAG = "CAN";
 
 static void ledBlinker(void *parameter) {
 
@@ -15,84 +18,32 @@ static void ledBlinker(void *parameter) {
 	}
 }
 
-static void send_daly_frame() {
-	//CAN.beginPacket(0x18, -1, true);
-	//CAN.write(0x90);
-	//CAN.write(0x01);
-	//CAN.write(0x40);
-	//if (!CAN.endPacket()) {
-	//	Serial.printf("TX failed\n");
-	//}
-
-	CAN.beginExtendedPacket(0x18900140, -1, true);
-	CAN.endPacket();
-}
-
-void send_daly_frame(int interval) {
-	static unsigned long last_time = 0;
-	if (millis() - last_time < interval) {
-		return;
-	}
-	last_time = millis();
-	send_daly_frame();
-	Serial.printf("Sent\n");
-}
-
 void setup() {
 	xTaskCreate(ledBlinker, "ledBlinker", 2048, NULL, 1, NULL);
+
+	twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(GPIO_NUM_13, GPIO_NUM_12, TWAI_MODE_NORMAL);
+	twai_timing_config_t t_config = TWAI_TIMING_CONFIG_250KBITS();
+	twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
+	twai_driver_install(&g_config, &t_config, &f_config);
+	twai_start();
 
 	Serial.begin(115200);
     while (!Serial);
 
-
-    Serial.println("CAN Receiver");
-    CAN.setPins(GPIO_NUM_12, GPIO_NUM_13);
-    if (!CAN.begin(250E3)) {
-        Serial.println("Starting CAN failed!");
-        while (1);
-    }
-
+	ESP_LOGI(TAG, "TWAI driver installed and started");
 
 }
 
 void loop() {
-    // try to parse packet
-    int packetSize = CAN.parsePacket();
-
-    if (packetSize) {
-		// received a packet
-		Serial.print("Received ");
-
-		if (CAN.packetExtended()) {
-			Serial.print("extended ");
+	twai_message_t message;
+	if (twai_receive(&message, pdMS_TO_TICKS(100)) == ESP_OK) {
+		char buffer[256] = {0};
+		sprintf(buffer, "Received message: ID=0x%X, Length=%d\n", message.identifier, message.data_length_code);
+		for (int i = 0; i < message.data_length_code; i++) {
+			sprintf(buffer + strlen(buffer), "0x%02X ", message.data[i]);
 		}
-
-		if (CAN.packetRtr()) {
-			// Remote transmission request, packet contains no data
-			Serial.print("RTR ");
-		}
-
-		Serial.print("packet with id 0x");
-		Serial.print(CAN.packetId(), HEX);
-
-		if (CAN.packetRtr()) {
-			Serial.print(" and requested length ");
-			Serial.println(CAN.packetDlc());
-		} else {
-			Serial.print(" and length ");
-			Serial.println(packetSize);
-
-			// only print packet data for non-RTR packets
-
-			while (CAN.available()) {
-				Serial.print((char)CAN.read());
-			}
-			Serial.println();
-		}
-
-		Serial.println();
-    }
-
-	send_daly_frame(1000);
+		strcat(buffer, "\n");
+		Serial.print(buffer);
+	}
 }
 
