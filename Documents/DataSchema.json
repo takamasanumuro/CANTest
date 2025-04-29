@@ -1,0 +1,157 @@
+{
+  "messages": [
+    {
+      "id": "0x180117EF",
+      "name": "Message I",
+      "direction": "MCU -> METER",
+      "description": "Periodic data including voltage, current, phase current, and speed",
+      "data": [
+        {
+          "byte": [0, 1],
+          "name": "Bus Voltage",
+          "resolution": "0.1 V/bit",
+          "offset": 0,
+          "range": "0–300 V"
+        },
+        {
+          "byte": [2, 3],
+          "name": "Bus Current",
+          "resolution": "0.1 A/bit",
+          "offset": -3200,
+          "range": "-3200–3200 A"
+        },
+        {
+          "byte": [4, 5],
+          "name": "Phase Current",
+          "resolution": "0.1 A/bit",
+          "offset": -3200,
+          "range": "-3200–3200 A"
+        },
+        {
+          "byte": [6, 7],
+          "name": "Speed",
+          "resolution": "0.1 RPM/bit",
+          "offset": -32000,
+          "range": "-32000–32000 RPM"
+        }
+      ]
+    },
+    {
+      "id": "0x180217EF",
+      "name": "Message II",
+      "direction": "MCU -> METER",
+      "description": "Polling data including temperatures, accelerator position, status, and error fields",
+      "data": [
+        {
+          "byte": 0,
+          "name": "Controller Temperature",
+          "resolution": "1 °C/bit",
+          "offset": -40,
+          "range": "-40–210 °C"
+        },
+        {
+          "byte": 1,
+          "name": "Motor Temperature",
+          "resolution": "1 °C/bit",
+          "offset": -40,
+          "range": "-40–210 °C"
+        },
+        {
+          "byte": 2,
+          "name": "Accelerator Opening",
+          "resolution": "1%/bit",
+          "offset": 0,
+          "range": "0–100%"
+        },
+        {
+          "byte": 3,
+          "name": "Status",
+          "fields": {
+            "bits_0_2": {
+              "name": "Gear",
+              "values": {
+                "0": "NO",
+                "1": "R",
+                "2": "N",
+                "3": "D1",
+                "4": "D2",
+                "5": "D3",
+                "6": "S",
+                "7": "P"
+              }
+            },
+            "bit_3": {
+              "name": "Brake",
+              "values": {
+                "0": "No Brake",
+                "1": "Brake"
+              }
+            },
+            "bits_4_6": {
+              "name": "Operation Mode",
+              "values": {
+                "2": "Cruise",
+                "3": "EBS",
+                "4": "Hold"
+              }
+            },
+            "bit_7": {
+              "name": "DC Contactor",
+              "values": {
+                "0": "OFF",
+                "1": "ON"
+              }
+            }
+          }
+        },
+        {
+          "byte": 4,
+          "name": "Error Byte 1",
+          "fields": [
+            "Overcurrent",
+            "Overload",
+            "Overvoltage",
+            "Undervoltage",
+            "Controller Overheat",
+            "Motor Overheat",
+            "Motor Stalled",
+            "Motor Out of Phase"
+          ]
+        },
+        {
+          "byte": 5,
+          "name": "Error Byte 2",
+          "fields": [
+            "Motor Sensor",
+            "Motor AUX Sensor",
+            "Encoder Misaligned",
+            "Anti-Runaway Engaged",
+            "Main Accelerator",
+            "AUX Accelerator",
+            "Pre-charge",
+            "DC Contactor"
+          ]
+        },
+        {
+          "byte": 6,
+          "name": "Error Byte 3",
+          "fields": [
+            "Power Valve",
+            "Current Sensor",
+            "Auto-tune",
+            "RS485",
+            "CAN",
+            "Software",
+            "Reserved",
+            "Reserved"
+          ]
+        },
+        {
+          "byte": 7,
+          "name": "Life Signal",
+          "range": "0–255"
+        }
+      ]
+    }
+  ]
+}
