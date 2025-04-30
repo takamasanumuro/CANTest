@@ -11,7 +11,7 @@ public:
         uint16_t bus_voltage_dV; // Bus voltage in 0.1V units
         int16_t bus_current_dA; // Bus current in 0.1A units (signed)
         int16_t phase_current_dA; // Phase current in 0.1A units (signed)
-        int16_t rpm_tenths; // RPM in 0.1 units (signed)
+        int16_t rpm; // RPM per bit (signed, offset 32000)
     };
 
     struct MotorStateData {

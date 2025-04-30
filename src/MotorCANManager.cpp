@@ -25,9 +25,10 @@ void MotorCANManager::handle_electrical_data(const twai_message_t& message, Moto
     data.bus_voltage_dV = (message.data[0] | (message.data[1] << 8));
     data.bus_current_dA = (message.data[2] | (message.data[3] << 8)) - 32000;
     data.phase_current_dA = (message.data[4] | (message.data[5] << 8)) - 32000;
-    data.rpm_tenths = (message.data[6] | (message.data[7] << 8)) - 32000;
+    data.rpm = (message.data[6] | (message.data[7] << 8)) - 32000;
     Serial.printf("Received Electrical Data: Bus Voltage=%.1fV, Bus Current=%.1fA, Phase Current=%.1fA, RPM=%d\n",
-        data.bus_voltage_dV / 10.f, data.bus_current_dA / 10.f, data.phase_current_dA / 10.f, data.rpm_tenths / 10);
+        data.bus_voltage_dV / 10.f, data.bus_current_dA / 10.f, data.phase_current_dA / 10.f, data.rpm);
+
 }
 
 void MotorCANManager::handle_state_data(const twai_message_t& message, MotorStateData& data) {
