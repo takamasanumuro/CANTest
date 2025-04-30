@@ -3,180 +3,63 @@
 
 #include <Arduino.h>
 #include "driver/twai.h"
-#include "esp_log.h" 
-#include <map>
+#include "esp_log.h"
+#include "MotorCANManager.h"
 
 static const char* TAG = "CAN";
-#define CAN_ELECTRICAL_DATA_ID  0x180117EF
-#define CAN_STATE_DATA_ID 0x180217EF
 
-struct MotorElectricalData {
-	uint16_t bus_voltage_dV; // Bus voltage in 0.1V units
-	int16_t bus_current_dA; // Bus current in 0.1A units (signed)
-	int16_t phase_current_dA; // Phase current in 0.1A units (signed)
-	int16_t rpm_centi; // RPM in 0.1 units (signed)
-};
-
-struct MotorStateData {
-	int8_t controller_temp_C; // Controller temperature in Celsius units (signed)
-	int8_t motor_temp_C; // Motor temperature in Celsius units (signed)
-	uint8_t accelerator_percent; // Accelerator pedal pos;ition in percent (0-100)
-	uint8_t status; // Gear, brake, operation mode, DC contactor
-	uint32_t error; // Error codes
-};
-
-void handle_electrical_data(const twai_message_t& message) {
-	MotorElectricalData data;
-	data.bus_voltage_dV = message.data[0] | (message.data[1] << 8);
-	data.bus_current_dA = message.data[2] | (message.data[3] << 8) - 3200;
-	data.phase_current_dA = message.data[4] | (message.data[5] << 8) - 3200;
-	data.rpm_centi = message.data[6] | (message.data[7] << 8) - 32000;
-	Serial.printf("Received Electrical Data: Bus Voltage=%dV, Bus Current=%dA, Phase Current=%dA, RPM=%d\n",
-		data.bus_voltage_dV, data.bus_current_dA, data.phase_current_dA, data.rpm_centi);
-}
-
-void decode_motor_status(uint8_t status) {
-	uint8_t gear = status & (BIT2 | BIT1 | BIT0); // Mask for gear bits
-	const char* gear_str = "";
-	switch (gear) {
-		case 0b000: gear_str = "NO"; break;
-		case 0b001: gear_str = "R"; break;
-		case 0b010: gear_str = "N"; break;
-		case 0b011: gear_str = "D1"; break;
-		case 0b100: gear_str = "D2"; break;
-		case 0b101: gear_str = "D3"; break;
-		case 0b110: gear_str = "S"; break;
-		case 0b111: gear_str = "P"; break;
-		default: gear_str = "Unknown gear"; break;
-	}
-
-	bool brake = (status & BIT3) >> 3; // Brake bit
-	const char* brake_str = brake ? "ON" : "OFF";
-
-	uint8_t operation_mode = (status & (BIT6 | BIT5 | BIT4)) >> 4;
-	const char* operation_mode_str = "";
-	switch (operation_mode) {
-		case 0b000: operation_mode_str = "Stopped"; break;
-		case 0b001: operation_mode_str = "Drive"; break;
-		case 0b010: operation_mode_str = "Cruise"; break;
-		case 0b011: operation_mode_str = "EBS"; break;
-		case 0b100: operation_mode_str = "Hold"; break;
-	}
-
-	uint8_t dc_contactor = (status & BIT7) >> 7; // DC contactor bit
-	const char* dc_contactor_str = dc_contactor ? "ON" : "OFF";
-
-	printf("Gear: %s, Brake: %s, Operation Mode: %s, DC Contactor: %s\n",
-		gear_str, brake_str, operation_mode_str, dc_contactor_str);
-}
-
-void decode_motor_error(uint32_t error) {
-    std::map<uint32_t, const char*> error_map = {
-        {BIT0, "Motor Overcurrent"},
-        {BIT1, "Motor Overload"},
-        {BIT2, "Motor Overvoltage"},
-        {BIT3, "Motor Undervoltage"},
-        {BIT4, "Controller Overheat"},
-        {BIT5, "Motor Overheat"},
-        {BIT6, "Motor Stalled"},
-        {BIT7, "Motor Out of Phase"},
-        {BIT8, "Motor Sensor Failure"},
-        {BIT9, "Motor AUX Sensor"},
-        {BIT10, "Encoder Misaligned"},
-        {BIT11, "Anti-Runaway Engaged"},
-        {BIT12, "Main Accelerator"},
-        {BIT13, "AUX Accelerator"},
-        {BIT14, "Pre-charge"},
-        {BIT15, "DC Contactor"},
-        {BIT16, "Power Valve"},
-        {BIT17, "Current Sensor"},
-        {BIT18, "Auto-tune"},
-        {BIT19, "RS485"},
-        {BIT20, "CAN"},
-        {BIT21, "Software"}
-    };
-
-	for (const auto& pair : error_map) {
-		if (error & pair.first) {
-			Serial.printf("Error: %s\n", pair.second);
-		}
-	}
-}
-
-void handle_state_data(const twai_message_t& message) {
-	MotorStateData data;
-	data.controller_temp_C = message.data[0] - 40;
-	data.motor_temp_C = message.data[1] - 40;
-	data.accelerator_percent = message.data[2];
-	data.status = message.data[3];
-	data.error = message.data[4] | (message.data[5] << 8) | (message.data[6] << 16) || (message.data[7] << 24);
-	Serial.printf("Received State Data: Controller Temp=%dC, Motor Temp=%dC, Accelerator=%d%%, Status=%d, Error=0x%X\n",
-		data.controller_temp_C, data.motor_temp_C, data.accelerator_percent, data.status, data.error);
-	decode_motor_status(data.status);
-	decode_motor_error(data.error);
-}
-
-void handle_can_frame(const twai_message_t& message) {
-	if (message.identifier == CAN_ELECTRICAL_DATA_ID) {
-		handle_electrical_data(message);
-	} else if (message.identifier == CAN_STATE_DATA_ID) {
-		handle_state_data(message);
-	} else {
-		Serial.printf("Unknown CAN ID: 0x%X\n", message.identifier);
-	}
-}
+MotorCANManager motor_can_manager;
 
 void can_receive_task(void* parameter) {
-	
-	while (true) {
-		twai_message_t message;
-		if (twai_receive(&message, pdMS_TO_TICKS(portMAX_DELAY)) == ESP_OK) {
-			handle_can_frame(message);
-		}
-	}
+    while (true) {
+        twai_message_t message;
+        if (twai_receive(&message, pdMS_TO_TICKS(portMAX_DELAY)) == ESP_OK) {
+            motor_can_manager.handle_can_frame(message);
+        }
+    }
 }
 
 static void ledBlinker(void *parameter) {
 
-	pinMode(GPIO_NUM_2, OUTPUT);
-	while (true) {
-		digitalWrite(GPIO_NUM_2, HIGH);
-		delay(500);
-		digitalWrite(GPIO_NUM_2, LOW);
-		delay(500);
-	}
+    pinMode(GPIO_NUM_2, OUTPUT);
+    while (true) {
+        digitalWrite(GPIO_NUM_2, HIGH);
+        delay(500);
+        digitalWrite(GPIO_NUM_2, LOW);
+        delay(500);
+    }
 }
 
 void simple_reception_test() {
-	twai_message_t message;
-	if (twai_receive(&message, pdMS_TO_TICKS(100)) == ESP_OK) {
-		char buffer[256] = {0};
-		sprintf(buffer, "Received message: ID=0x%X, Length=%d\n", message.identifier, message.data_length_code);
-		for (int i = 0; i < message.data_length_code; i++) {
-			sprintf(buffer + strlen(buffer), "0x%02X ", message.data[i]);
-		}
-		strcat(buffer, "\n");
-		Serial.print(buffer);
-	}
+    twai_message_t message;
+    if (twai_receive(&message, pdMS_TO_TICKS(100)) == ESP_OK) {
+        char buffer[256] = {0};
+        sprintf(buffer, "Received message: ID=0x%X, Length=%d\n", message.identifier, message.data_length_code);
+        for (int i = 0; i < message.data_length_code; i++) {
+            sprintf(buffer + strlen(buffer), "0x%02X ", message.data[i]);
+        }
+        strcat(buffer, "\n");
+        Serial.print(buffer);
+    }
 }
 
 void setup() {
-	xTaskCreate(ledBlinker, "ledBlinker", 2048, NULL, 1, NULL);
+    xTaskCreate(ledBlinker, "ledBlinker", 2048, NULL, 1, NULL);
 
-	twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(GPIO_NUM_13, GPIO_NUM_12, TWAI_MODE_NORMAL);
-	twai_timing_config_t t_config = TWAI_TIMING_CONFIG_250KBITS();
-	twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
-	twai_driver_install(&g_config, &t_config, &f_config);
-	twai_start();
+    twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(GPIO_NUM_13, GPIO_NUM_12, TWAI_MODE_NORMAL);
+    twai_timing_config_t t_config = TWAI_TIMING_CONFIG_250KBITS();
+    twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
+    twai_driver_install(&g_config, &t_config, &f_config);
+    twai_start();
 
-	Serial.begin(115200);
+    Serial.begin(115200);
     while (!Serial);
 
-	ESP_LOGI(TAG, "TWAI driver installed and started");
-	xTaskCreate(can_receive_task, "CANReceiveTask", 2048, NULL, 1, NULL);
+    ESP_LOGI(TAG, "TWAI driver installed and started");
+    xTaskCreate(can_receive_task, "CANReceiveTask", 2048, NULL, 1, NULL);
 }
 
 void loop() {
-	vTaskDelete(NULL); // Delete the task to free up resources
+    vTaskDelete(NULL); // Delete the task to free up resources
 }
 
