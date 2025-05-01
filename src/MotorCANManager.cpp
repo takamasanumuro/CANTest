@@ -26,6 +26,14 @@ void MotorCANManager::handle_electrical_data(const twai_message_t& message, Moto
     data.bus_current_dA = (message.data[2] | (message.data[3] << 8)) - 32000;
     data.phase_current_dA = (message.data[4] | (message.data[5] << 8)) - 32000;
     data.rpm = (message.data[6] | (message.data[7] << 8)) - 32000;
+    
+    if (message.identifier == CAN_ELECTRICAL_DATA_ID_LEFT) {
+        _received_flags_left |= FLAG_ELECTRICAL;
+    } else if (message.identifier == CAN_ELECTRICAL_DATA_ID_RIGHT) {
+        _received_flags_right |= FLAG_ELECTRICAL;
+    }
+    check_and_publish(); // Check and publish data if all flags are set
+    
     Serial.printf("Received Electrical Data: Bus Voltage=%.1fV, Bus Current=%.1fA, Phase Current=%.1fA, RPM=%d\n",
         data.bus_voltage_dV / 10.f, data.bus_current_dA / 10.f, data.phase_current_dA / 10.f, data.rpm);
 
@@ -37,10 +45,34 @@ void MotorCANManager::handle_state_data(const twai_message_t& message, MotorStat
     data.accelerator_percent = message.data[2];
     data.status = message.data[3];
     data.error = message.data[4] | (message.data[5] << 8) | (message.data[6] << 16) | (message.data[7] << 24);
+
+    if (message.identifier == CAN_STATE_DATA_ID_LEFT) {
+        _received_flags_left |= FLAG_STATE;
+    } else if (message.identifier == CAN_STATE_DATA_ID_RIGHT) {
+        _received_flags_right |= FLAG_STATE;
+    }
+    check_and_publish(); // Check and publish data if all flags are set
+    
     Serial.printf("Received State Data: Controller Temp=%dC, Motor Temp=%dC, Accelerator=%d%%, Status=0x%02X, Error=0x%02X\n",
         data.controller_temp_C, data.motor_temp_C, data.accelerator_percent, data.status, data.error);
     decode_motor_status(data.status);
     decode_motor_error(data.error);
+}
+
+void MotorCANManager::set_data_queue(QueueHandle_t queue) {
+    _data_queue = queue;
+}
+
+void MotorCANManager::check_and_publish() {
+    if (_received_flags_left == (FLAG_ELECTRICAL | FLAG_STATE) && _data_queue) {
+        xQueueSend(_data_queue, &motor_data_left, 0);
+        _received_flags_left = 0; // Reset for next cycle
+    }
+
+    if (_received_flags_right == (FLAG_ELECTRICAL | FLAG_STATE) && _data_queue) {
+        xQueueSend(_data_queue, &motor_data_right, 0);
+        _received_flags_right = 0; // Reset for next cycle
+    }
 }
 
 void MotorCANManager::initialize_can_handlers() {

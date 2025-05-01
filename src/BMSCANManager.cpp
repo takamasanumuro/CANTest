@@ -62,12 +62,26 @@ void BMSCANManager::initialize_can_handlers() {
     };
 }
 
+void BMSCANManager::set_data_queue(QueueHandle_t queue) {
+    _data_queue = queue;
+}
+
+// Helper to check and publish
+void BMSCANManager::check_and_publish() {
+    if (_received_flags == ALL_FLAGS && _data_queue) {
+        xQueueSend(_data_queue, &_bms_data, 0);
+        _received_flags = 0; // Reset for next cycle
+    }
+}
+
 void BMSCANManager::handle_voltage_response(const twai_message_t& message) {
     _bms_data.voltage_data.cumulative_voltage_decivolts = ((message.data[0] << 8) | message.data[1]);
     _bms_data.voltage_data.current_deciamps = ((message.data[4] << 8) | message.data[5]) - 30000;
     _bms_data.voltage_data.soc_millipercent = ((message.data[6] << 8) | message.data[7]);
     Serial.printf("[BMS] Voltage Data: Cumulative Voltage=%.1fV, Current=%.1fA, SOC=%.1f%%\n",
         _bms_data.voltage_data.cumulative_voltage_decivolts / 10.f, _bms_data.voltage_data.current_deciamps / 10.f, _bms_data.voltage_data.soc_millipercent / 10.f);
+    _received_flags |= FLAG_VOLTAGE;
+    check_and_publish();
 }
 
 void BMSCANManager::handle_charge_discharge_response(const twai_message_t& message) {
@@ -79,6 +93,8 @@ void BMSCANManager::handle_charge_discharge_response(const twai_message_t& messa
     Serial.printf("[BMS] Charge/Discharge Status: State=%d, Charge MOS=%d, Discharge MOS=%d, BMS Life Cycles=%d, Remaining Capacity=%d mAh\n",
         _bms_data.charge_discharge_status.state, _bms_data.charge_discharge_status.charge_mos, _bms_data.charge_discharge_status.discharge_mos,
         _bms_data.charge_discharge_status.bms_life_cycles, _bms_data.charge_discharge_status.remaining_capacity_raw);
+    _received_flags |= FLAG_CHARGE_DISCHARGE;
+    check_and_publish();
 }
 
 void BMSCANManager::handle_status_response(const twai_message_t& message) {
@@ -90,6 +106,8 @@ void BMSCANManager::handle_status_response(const twai_message_t& message) {
     Serial.printf("[BMS] BMS Status: Num Strings=%d, Num Temp Sensors=%d, Charger Status=%d, Load Status=%d, IO Bitfield=0x%02X\n",
         _bms_data.bms_status.num_strings, _bms_data.bms_status.num_temp_sensors, _bms_data.bms_status.charger_status,
         _bms_data.bms_status.load_status, _bms_data.bms_status.io_bitfield);
+    _received_flags |= FLAG_STATUS;
+    check_and_publish();
 }
 
 void BMSCANManager::handle_cell_voltage_response(const twai_message_t& message) {
@@ -109,6 +127,8 @@ void BMSCANManager::handle_cell_voltage_response(const twai_message_t& message) 
         _bms_data.cell_voltage_frame[frame_index].voltages_mv[0],
         _bms_data.cell_voltage_frame[frame_index].voltages_mv[1],
         _bms_data.cell_voltage_frame[frame_index].voltages_mv[2]);
+    _received_flags |= FLAG_CELL_VOLTAGE;
+    check_and_publish();
 }
     
 void BMSCANManager::handle_temperature_response(const twai_message_t& message) {
@@ -132,7 +152,8 @@ void BMSCANManager::handle_temperature_response(const twai_message_t& message) {
         _bms_data.temperature_frame[frame_index].raw_temps[4],
         _bms_data.temperature_frame[frame_index].raw_temps[5],
         _bms_data.temperature_frame[frame_index].raw_temps[6]);
-
+    _received_flags |= FLAG_TEMPERATURE;
+    check_and_publish();
 }
 
 void BMSCANManager::handle_failure_response(const twai_message_t& message) {
@@ -148,6 +169,8 @@ void BMSCANManager::handle_failure_response(const twai_message_t& message) {
     }
     snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "]\n");
     Serial.print(buffer);
+    _received_flags |= FLAG_FAILURE;
+    check_and_publish();
 }
 
 void BMSCANManager::poll_bms_data() {

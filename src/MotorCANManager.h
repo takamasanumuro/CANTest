@@ -71,13 +71,20 @@ public:
         uint32_t error;                // Error codes (bitmask, see above)
     };
 
+    enum MotorIndex {
+        LEFT_MOTOR = 0,
+        RIGHT_MOTOR = 1
+    };
+
     struct MotorData {
         MotorElectricalData electrical_data;
         MotorStateData state_data;
+        MotorIndex motor_index;
     };
 
     MotorCANManager();
     bool handle_can_frame(const twai_message_t& message) override;
+    void set_data_queue(QueueHandle_t queue);
 
 private:
     MotorData motor_data_left;
@@ -89,4 +96,12 @@ private:
     void handle_state_data(const twai_message_t& message, MotorStateData& data);
     void decode_motor_status(uint8_t status);
     void decode_motor_error(uint32_t error);
+
+    QueueHandle_t _data_queue = nullptr;
+    uint8_t _received_flags_left = 0;
+    uint8_t _received_flags_right = 0;
+    static constexpr uint8_t FLAG_ELECTRICAL = 1 << 0;
+    static constexpr uint8_t FLAG_STATE = 1 << 1;
+    static constexpr uint8_t ALL_FLAGS = FLAG_ELECTRICAL | FLAG_STATE;
+    void check_and_publish();
 };
