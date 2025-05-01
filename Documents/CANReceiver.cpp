@@ -89,12 +89,12 @@ public:
 		initialize_can_handlers();
 	}
 
-	void handle_can_frame(const twai_message_t& message) {
+	bool handle_can_frame(const twai_message_t& message) {
 		if (can_handlers.find(message.identifier) != can_handlers.end()) {
 			can_handlers[message.identifier](message);
-		} else {
-			Serial.printf("Unknown CAN ID: 0x%X\n", message.identifier);
+			return true;
 		}
+		return false;
 	}
 
 	void handle_electrical_data(const twai_message_t& message, MotorElectricalData& data) {

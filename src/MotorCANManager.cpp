@@ -13,12 +13,12 @@ MotorCANManager::MotorCANManager() {
     initialize_can_handlers();
 }
 
-void MotorCANManager::handle_can_frame(const twai_message_t& message) {
+bool MotorCANManager::handle_can_frame(const twai_message_t& message) {
     if (can_handlers.find(message.identifier) != can_handlers.end()) {
         can_handlers[message.identifier](message);
-    } else {
-        Serial.printf("Unknown CAN ID: 0x%X\n", message.identifier);
+        return true;
     }
+    return false;
 }
 
 void MotorCANManager::handle_electrical_data(const twai_message_t& message, MotorElectricalData& data) {

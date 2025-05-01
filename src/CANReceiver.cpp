@@ -5,17 +5,28 @@
 #include "driver/twai.h"
 #include "esp_log.h"
 #include "MotorCANManager.h"
+#include "BMSCANManager.h"
 
 static const char* TAG = "CAN";
 
 MotorCANManager motor_can_manager;
+BMSCANManager bms_can_manager;
 
 void can_receive_task(void* parameter) {
     while (true) {
         twai_message_t message;
-        if (twai_receive(&message, pdMS_TO_TICKS(portMAX_DELAY)) == ESP_OK) {
-            motor_can_manager.handle_can_frame(message);
-        }
+        if (twai_receive(&message, pdMS_TO_TICKS(portMAX_DELAY)) != ESP_OK) continue;
+
+        if (bms_can_manager.handle_can_frame(message)) continue;
+        if (motor_can_manager.handle_can_frame(message)) continue;
+    }
+}
+
+void can_transmit_task(void* parameter) {
+    while (true) {
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1 second
+        
+        bms_can_manager.poll_bms_data(); // Poll BMS data every second
     }
 }
 
@@ -47,16 +58,19 @@ void setup() {
     xTaskCreate(ledBlinker, "ledBlinker", 2048, NULL, 1, NULL);
 
     twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(GPIO_NUM_13, GPIO_NUM_12, TWAI_MODE_NORMAL);
+    g_config.rx_queue_len = 10;
     twai_timing_config_t t_config = TWAI_TIMING_CONFIG_250KBITS();
     twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
+
     twai_driver_install(&g_config, &t_config, &f_config);
     twai_start();
 
-    Serial.begin(115200);
+    Serial.begin(921600); // Too low baud rates can cause missing CAN messages output on the serial monitor
     while (!Serial);
 
     ESP_LOGI(TAG, "TWAI driver installed and started");
-    xTaskCreate(can_receive_task, "CANReceiveTask", 2048, NULL, 1, NULL);
+    xTaskCreate(can_receive_task, "CANReceiveTask", 4096, NULL, 3, NULL);
+    xTaskCreate(can_transmit_task, "CANTransmitTask", 4096, NULL, 2, NULL);
 }
 
 void loop() {

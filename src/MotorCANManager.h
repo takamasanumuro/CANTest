@@ -77,7 +77,7 @@ public:
     };
 
     MotorCANManager();
-    void handle_can_frame(const twai_message_t& message) override;
+    bool handle_can_frame(const twai_message_t& message) override;
 
 private:
     MotorData motor_data_left;
