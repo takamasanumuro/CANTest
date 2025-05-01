@@ -6,6 +6,8 @@
 #include "esp_log.h"
 #include "MotorCANManager.h"
 #include "BMSCANManager.h"
+#include "LedBlinker.h"
+
 
 static const char* TAG = "CAN";
 
@@ -17,6 +19,7 @@ void can_receive_task(void* parameter) {
         twai_message_t message;
         if (twai_receive(&message, pdMS_TO_TICKS(portMAX_DELAY)) != ESP_OK) continue;
 
+        led_blinker_push(); // Blink the LED on CAN message reception
         if (bms_can_manager.handle_can_frame(message)) continue;
         if (motor_can_manager.handle_can_frame(message)) continue;
     }
@@ -27,17 +30,6 @@ void can_transmit_task(void* parameter) {
         vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1 second
         
         bms_can_manager.poll_bms_data(); // Poll BMS data every second
-    }
-}
-
-static void ledBlinker(void *parameter) {
-
-    pinMode(GPIO_NUM_2, OUTPUT);
-    while (true) {
-        digitalWrite(GPIO_NUM_2, HIGH);
-        delay(500);
-        digitalWrite(GPIO_NUM_2, LOW);
-        delay(500);
     }
 }
 
@@ -55,7 +47,7 @@ void simple_reception_test() {
 }
 
 void setup() {
-    xTaskCreate(ledBlinker, "ledBlinker", 2048, NULL, 1, NULL);
+
 
     twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(GPIO_NUM_13, GPIO_NUM_12, TWAI_MODE_NORMAL);
     g_config.rx_queue_len = 10;
@@ -69,6 +61,7 @@ void setup() {
     while (!Serial);
 
     ESP_LOGI(TAG, "TWAI driver installed and started");
+    led_blinker_init(); // Initialize the LED blinker
     xTaskCreate(can_receive_task, "CANReceiveTask", 4096, NULL, 3, NULL);
     xTaskCreate(can_transmit_task, "CANTransmitTask", 4096, NULL, 2, NULL);
 }
