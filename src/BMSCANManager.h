@@ -45,7 +45,7 @@
 
 typedef struct {
     uint16_t cumulative_voltage_decivolts; // Cumulative voltage (0.1V)
-    uint16_t current_deciamps; // Current (0.1A)
+    int16_t current_deciamps; // Current (0.1A)
     uint16_t soc_decipercent; // State of charge (0.1%)
 } voltage_data_t;
 

@@ -158,7 +158,7 @@ void BMSCANManager::handle_temperature_response(const twai_message_t& message) {
 
 void BMSCANManager::handle_failure_response(const twai_message_t& message) {
     memcpy(_bms_data.failure_status.raw, message.data, sizeof(_bms_data.failure_status.raw));
-    char buffer[64];
+    char buffer[128];
     snprintf(buffer, sizeof(buffer), "[BMS] Failure Status: [");
     for (int i = 0; i < sizeof(_bms_data.failure_status.raw); i++) {
         snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer),
