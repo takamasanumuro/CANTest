@@ -77,9 +77,9 @@ void BMSCANManager::check_and_publish() {
 void BMSCANManager::handle_voltage_response(const twai_message_t& message) {
     _bms_data.voltage_data.cumulative_voltage_decivolts = ((message.data[0] << 8) | message.data[1]);
     _bms_data.voltage_data.current_deciamps = ((message.data[4] << 8) | message.data[5]) - 30000;
-    _bms_data.voltage_data.soc_millipercent = ((message.data[6] << 8) | message.data[7]);
+    _bms_data.voltage_data.soc_decipercent = ((message.data[6] << 8) | message.data[7]);
     Serial.printf("[BMS] Voltage Data: Cumulative Voltage=%.1fV, Current=%.1fA, SOC=%.1f%%\n",
-        _bms_data.voltage_data.cumulative_voltage_decivolts / 10.f, _bms_data.voltage_data.current_deciamps / 10.f, _bms_data.voltage_data.soc_millipercent / 10.f);
+        _bms_data.voltage_data.cumulative_voltage_decivolts / 10.f, _bms_data.voltage_data.current_deciamps / 10.f, _bms_data.voltage_data.soc_decipercent / 10.f);
     _received_flags |= FLAG_VOLTAGE;
     check_and_publish();
 }

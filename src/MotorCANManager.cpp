@@ -21,7 +21,7 @@ bool MotorCANManager::handle_can_frame(const twai_message_t& message) {
     return false;
 }
 
-void MotorCANManager::handle_electrical_data(const twai_message_t& message, MotorElectricalData& data) {
+void MotorCANManager::handle_electrical_data(const twai_message_t& message, motor_electrical_data_t& data) {
     data.bus_voltage_dV = (message.data[0] | (message.data[1] << 8));
     data.bus_current_dA = (message.data[2] | (message.data[3] << 8)) - 32000;
     data.phase_current_dA = (message.data[4] | (message.data[5] << 8)) - 32000;
@@ -39,7 +39,7 @@ void MotorCANManager::handle_electrical_data(const twai_message_t& message, Moto
 
 }
 
-void MotorCANManager::handle_state_data(const twai_message_t& message, MotorStateData& data) {
+void MotorCANManager::handle_state_data(const twai_message_t& message, motor_state_data_t& data) {
     data.controller_temp_C = message.data[0] - 40;
     data.motor_temp_C = message.data[1] - 40;
     data.accelerator_percent = message.data[2];

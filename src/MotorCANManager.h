@@ -7,14 +7,14 @@
 
 class MotorCANManager : public ICANManager {
 public:
-    struct MotorElectricalData {
+    typedef struct  {
         uint16_t bus_voltage_dV; // Bus voltage in 0.1V units
         int16_t bus_current_dA; // Bus current in 0.1A units (signed)
         int16_t phase_current_dA; // Phase current in 0.1A units (signed)
         int16_t rpm; // RPM per bit (signed, offset 32000)
-    };
+    } motor_electrical_data_t;
 
-    struct MotorStateData {
+    typedef struct {
         int8_t controller_temp_C;      // Controller temperature in Celsius units (signed)
         int8_t motor_temp_C;           // Motor temperature in Celsius units (signed)
         uint8_t accelerator_percent;   // Accelerator pedal position in percent (0-100)
@@ -69,31 +69,31 @@ public:
          * 21: Software
          */
         uint32_t error;                // Error codes (bitmask, see above)
-    };
+    } motor_state_data_t;
 
-    enum MotorIndex {
+    typedef enum  {
         LEFT_MOTOR = 0,
         RIGHT_MOTOR = 1
-    };
+    } motor_index_t;
 
-    struct MotorData {
-        MotorElectricalData electrical_data;
-        MotorStateData state_data;
-        MotorIndex motor_index;
-    };
+    typedef struct {
+        motor_electrical_data_t electrical_data;
+        motor_state_data_t state_data;
+        motor_index_t motor;
+    } motor_data_t;
 
     MotorCANManager();
     bool handle_can_frame(const twai_message_t& message) override;
     void set_data_queue(QueueHandle_t queue);
 
 private:
-    MotorData motor_data_left;
-    MotorData motor_data_right;
+    motor_data_t motor_data_left;
+    motor_data_t motor_data_right;
     using CANHandler = std::function<void(const twai_message_t&)>;
     std::map<uint32_t, CANHandler> can_handlers;
     void initialize_can_handlers();
-    void handle_electrical_data(const twai_message_t& message, MotorElectricalData& data);
-    void handle_state_data(const twai_message_t& message, MotorStateData& data);
+    void handle_electrical_data(const twai_message_t& message, motor_electrical_data_t& data);
+    void handle_state_data(const twai_message_t& message, motor_state_data_t& data);
     void decode_motor_status(uint8_t status);
     void decode_motor_error(uint32_t error);
 
